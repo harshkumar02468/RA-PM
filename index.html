@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Search</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-image: url('Axis_Wallpaper.jpg'); /* Replace 'background.jpg' with your image path */
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: rgba(255, 255, 255, 0.8); /* Background color with transparency */
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        .suggestions {
+            border: 1px solid #ccc;
+            padding: 5px;
+            background-color: #fff;
+            max-height: 150px;
+            overflow-y: auto;
+            margin-top: 5px;
+        }
+        .search-container {
+            margin-bottom: 10px;
+        }
+        .search-container input[type="text"],
+        .search-container input[type="password"] {
+            width: calc(100% - 30px);
+            padding: 8px;
+            margin: 5px 0;
+            display: inline-block;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .search-container button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .search-container button:hover {
+            background-color: #45a049;
+        }
+        .result-container {
+            margin-top: 10px;
+        }
+        .result-container div {
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Authentication Layer -->
+    <div id="authLayer" class="container">
+        <h1>Authentication Required</h1>
+        <label for="pinInput">Enter PIN: </label>
+        <input type="password" id="pinInput" placeholder="Enter PIN">
+        <button onclick="authenticate()">Submit</button>
+        <div id="authError" class="error"></div>
+    </div>
+
+    <!-- Main Content (Initially Hidden) -->
+    <div id="mainContent" class="container" style="display:none;">
+        <h1>Data Search</h1>
+        <div class="search-container">
+            <input type="text" id="nameSearch" placeholder="Search by name" oninput="showNameSuggestions()">
+            <div id="nameSuggestions" class="suggestions"></div>
+        </div>
+        <div class="search-container">
+            <input type="text" id="parameterSearch" placeholder="Search by parameter" onclick="showParameterSuggestions()">
+            <div id="parameterSuggestions" class="suggestions"></div>
+        </div>
+        <button onclick="retrieveData()">Submit</button>
+        <div id="result" class="result-container"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <script>
+        // Static Simulation of Authentication
+        const correctPin = "2024";
+
+        function authenticate() {
+            const pin = document.getElementById('pinInput').value;
+            const authError = document.getElementById('authError');
+            if (pin === correctPin) {
+                document.getElementById('authLayer').style.display = 'none';
+                document.getElementById('mainContent').style.display = 'block';
+            } else {
+                authError.textContent = 'Incorrect PIN. Please try again.';
+            }
+        }
+
+        let excelData = [];
+        let columnNames = [];
+
+        document.addEventListener("DOMContentLoaded", () => {
+            // Load Excel file from the correct local path
+            fetch('example_data.xlsx')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok: ' + response.statusText);
+                    }
+                    return response.arrayBuffer();
+                })
+                .then(data => {
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    excelData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                    columnNames = excelData[0];
+                })
+                .catch(error => {
+                    console.error('There has been a problem with your fetch operation:', error);
+                    alert('Error: ' + error.message);
+                });
+        });
+
+        function showNameSuggestions() {
+            const input = document.getElementById('nameSearch').value.toLowerCase();
+            const suggestionsBox = document.getElementById('nameSuggestions');
+            suggestionsBox.innerHTML = '';
+            if (input) {
+                const suggestions = excelData.slice(1).filter(row => row[0].toLowerCase().startsWith(input));
+                suggestions.forEach(row => {
+                    const suggestion = document.createElement('div');
+                    suggestion.textContent = row[0];
+                    suggestion.onclick = () => {
+                        document.getElementById('nameSearch').value = row[0];
+                        suggestionsBox.innerHTML = '';
+                    };
+                    suggestionsBox.appendChild(suggestion);
+                });
+            }
+        }
+
+        function showParameterSuggestions() {
+            const suggestionsBox = document.getElementById('parameterSuggestions');
+            suggestionsBox.innerHTML = '';
+            columnNames.forEach(name => {
+                const suggestion = document.createElement('div');
+                suggestion.textContent = name;
+                suggestion.onclick = () => {
+                    document.getElementById('parameterSearch').value = name;
+                    suggestionsBox.innerHTML = '';
+                };
+                suggestionsBox.appendChild(suggestion);
+            });
+        }
+
+        function retrieveData() {
+            const name = document.getElementById('nameSearch').value.toLowerCase();
+            const parameter = document.getElementById('parameterSearch').value;
+            const resultBox = document.getElementById('result');
+
+            const row = excelData.find(row => row[0].toLowerCase() === name);
+            if (!row) {
+                resultBox.innerHTML = '<div class="error">Name not found.</div>';
+                return;
+            }
+
+            const colIndex = columnNames.indexOf(parameter);
+            if (colIndex === -1) {
+                resultBox.innerHTML = '<div class="error">Parameter not found.</div>';
+                return;
+            }
+
+            const value = row[colIndex];
+            resultBox.innerHTML = `<div>Data found: ${value !== undefined ? value : 'Data not available.'}</div>`;
+        }
+    </script>
+</body>
+</html>
